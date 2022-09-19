@@ -1,0 +1,95 @@
+ID: myfirstapp
+_schema-version: 3.2.0
+version: 0.0.1
+parameters:
+  enable-parallel-deployments: true
+modules:
+  - name: myfirstappapprouter
+    type: nodejs
+    path: approuter
+    parameters:
+      disk-quota: 512M
+      memory: 512M
+    requires:
+      - name: myfirstapp_destination
+      - name: myfirstapp_html5_repo_runtime
+      - name: myfirstapp_uaa
+  - name: webapp_deployer
+    type: com.sap.application.content
+    path: deployer
+    requires:
+      - name: myfirstapp_html5_repo_host
+        parameters:
+          content-target: true
+    build-parameters:
+      build-result: resources
+      requires:
+        - name: uimodule
+          artifacts:
+            - dist/uimodule.zip
+          target-path: resources/
+  - name: uimodule
+    type: html5
+    path: uimodule
+    build-parameters:
+      builder: custom
+      commands:
+        - npm run build:uimodule --prefix ..
+      supported-platforms: []
+  - name: myfirstapp_destination_content
+    type: com.sap.application.content
+    build-parameters:
+      no-source: true
+    requires:
+      - name: myfirstapp_uaa
+        parameters:
+          service-key:
+            name: myfirstapp_uaa_key
+      - name: myfirstapp_html5_repo_host
+        parameters:
+          service-key:
+            name: myfirstapp_html5_repo_host_key
+      - name: myfirstapp_destination
+        parameters:
+          content-target: true
+    parameters:
+      content:
+        instance:
+          existing_destinations_policy: update
+          destinations:
+            - Name: myfirstapp_destination_html5
+              ServiceInstanceName: myfirstapp_html5_repo_host
+              ServiceKeyName: myfirstapp_html5_repo_host_key
+              sap.cloud.service: myfirstapp.service
+            - Name: myfirstapp_destination_uaa
+              Authentication: OAuth2UserTokenExchange
+              ServiceInstanceName: myfirstapp_uaa
+              ServiceKeyName: myfirstapp_uaa_key
+              sap.cloud.service: myfirstapp.service
+resources:
+  - name: myfirstapp_destination
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service-plan: lite
+      service: destination
+      config:
+        HTML5Runtime_enabled: true
+        version: 1.0.0
+  - name: myfirstapp_html5_repo_host
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service-plan: app-host
+      service: html5-apps-repo
+      config:
+        sizeLimit: 2
+  - name: myfirstapp_html5_repo_runtime
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service-plan: app-runtime
+      service: html5-apps-repo
+  - name: myfirstapp_uaa
+    type: org.cloudfoundry.managed-service
+    parameters:
+      path: ./xs-security.json
+      service-plan: application
+      service: xsuaa
